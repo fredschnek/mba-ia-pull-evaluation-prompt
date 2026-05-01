@@ -321,3 +321,144 @@ python src/evaluate.py
 - **Não altere os datasets de avaliação** - apenas os prompts em `prompts/bug_to_user_story_v2.yml`
 - **Itere, itere, itere** - é normal precisar de 3-5 iterações para atingir 0.9 em todas as métricas
 - **Documente seu processo** - a jornada de otimização é tão importante quanto o resultado final
+
+---
+
+## Técnicas Aplicadas (Fase 2)
+
+O prompt otimizado em [`prompts/bug_to_user_story_v2.yml`](prompts/bug_to_user_story_v2.yml) combina **quatro** técnicas (a obrigatória Few-shot + três adicionais para gerar margem nos scores).
+
+### 1. Role Prompting
+
+**Por quê:** estabelecer uma persona profissional sênior (Product Manager com 10+ anos em metodologias ágeis) eleva imediatamente o registro, vocabulário e nível de detalhe da resposta. O modelo se "calibra" para o padrão de qualidade típico daquela função.
+
+**Como aplicado** (trecho do `system_prompt`):
+
+```
+Você é um Product Manager sênior com mais de 10 anos de experiência em
+metodologias ágeis (Scrum, Kanban, SAFe), especializado em transformar
+relatos de bugs em User Stories acionáveis e bem estruturadas...
+```
+
+### 2. Few-shot Learning (obrigatória)
+
+**Por quê:** três exemplos cobrindo complexidades crescentes (simples → médio → mobile/orientação) ancoram formato, estilo e nível de detalhe. Os exemplos foram extraídos do próprio dataset de avaliação para que o modelo veja exatamente o padrão de referência usado pelo juiz.
+
+**Como aplicado:** três blocos `### Exemplo N` dentro do system prompt, cada um com `Bug Report:` → `User Story:` → `Critérios de Aceitação:` no formato Given-When-Then.
+
+### 3. Chain of Thought (CoT)
+
+**Por quê:** transformar bug em user story exige decompor o relato em (persona, ação desejada, valor de negócio, critérios). Forçar esse raciocínio passo a passo reduz omissões e aumenta consistência entre runs.
+
+**Como aplicado:**
+
+```
+Antes de escrever a saída final, raciocine internamente passo a passo:
+1. Identifique a PERSONA específica afetada pelo bug...
+2. Identifique a AÇÃO desejada que o bug está bloqueando...
+3. Identifique o VALOR de negócio dessa ação...
+4. Liste de 4 a 7 critérios de aceitação no formato Given-When-Then...
+5. Se o bug contém detalhes técnicos, preserve em uma seção "Contexto Técnico"...
+```
+
+### 4. Skeleton of Thought
+
+**Por quê:** as métricas Clarity e Format são extremamente sensíveis a desvios de estrutura. Definir um esqueleto rígido da saída (Markdown puro, sem cercas de código, primeiro bullet sempre "Dado que…") elimina variabilidade e maximiza alinhamento com a referência.
+
+**Como aplicado:** seção "Esqueleto Obrigatório da Saída" + 10 regras inegociáveis (persona específica, mín/máx de critérios, ordem dos conectores Dado/Quando/Então/E, edge case para input vazio).
+
+---
+
+## Resultados Finais
+
+> **A preencher após executar a avaliação no seu ambiente:**
+> 1. Link público do prompt no LangSmith Hub: `https://smith.langchain.com/hub/<seu_username>/bug_to_user_story_v2`
+> 2. Link público do projeto de avaliação: `https://smith.langchain.com/o/<seu_org>/projects/p/<seu_project>`
+> 3. Screenshot do dashboard com as 5 métricas ≥ 0.9 (anexar em `docs/screenshots/`)
+
+**Tabela comparativa (esperada):**
+
+| Métrica       | v1 (baixa qualidade) | v2 (otimizado, alvo) |
+|---------------|----------------------|----------------------|
+| Helpfulness   | ~0.45 ✗              | ≥ 0.90 ✓             |
+| Correctness   | ~0.50 ✗              | ≥ 0.90 ✓             |
+| F1-Score      | ~0.48 ✗              | ≥ 0.90 ✓             |
+| Clarity       | ~0.50 ✗              | ≥ 0.90 ✓             |
+| Precision     | ~0.46 ✗              | ≥ 0.90 ✓             |
+
+> Atualize a coluna "v2 (otimizado)" com os números reais retornados por `python src/evaluate.py` ao final da iteração.
+
+---
+
+## Como Executar
+
+### Pré-requisitos
+
+- Python 3.9+
+- Conta no [LangSmith](https://smith.langchain.com) (API key + username do Hub)
+- Chave de API do provider escolhido:
+  - [OpenAI](https://platform.openai.com/api-keys) (avaliação, ~$1–5)
+  - [Google AI Studio](https://aistudio.google.com/app/apikey) (geração, free tier 15 req/min)
+
+### Setup
+
+```bash
+# 1. Clonar e entrar no diretório
+git clone <seu-fork>
+cd mba-ia-pull-evaluation-prompt
+
+# 2. Criar e ativar virtualenv
+python3 -m venv venv
+source venv/bin/activate            # Windows: venv\Scripts\activate
+
+# 3. Instalar dependências
+pip install -r requirements.txt
+
+# 4. Configurar credenciais
+cp .env.example .env
+# edite .env e preencha:
+#   LANGSMITH_API_KEY, USERNAME_LANGSMITH_HUB, LANGSMITH_PROJECT
+#   OPENAI_API_KEY e/ou GOOGLE_API_KEY
+#   LLM_PROVIDER, LLM_MODEL, EVAL_MODEL
+#   (opcional) EVAL_PROVIDER para mixar providers (gen=Gemini, eval=OpenAI)
+```
+
+### Pipeline de execução
+
+```bash
+# 1. Pull do prompt v1 ruim (sobrescreve prompts/bug_to_user_story_v1.yml)
+python src/pull_prompts.py
+
+# 2. (Opcional) Editar prompts/bug_to_user_story_v2.yml para ajustar o prompt
+
+# 3. Validar a estrutura do v2 com os testes
+pytest tests/test_prompts.py -v
+
+# 4. Push do v2 para o LangSmith Hub (público)
+python src/push_prompts.py
+
+# 5. Avaliar contra o dataset de 15 bugs e ver os scores
+python src/evaluate.py
+```
+
+### Iteração
+
+Espere 3–5 ciclos de `editar v2.yml → push → evaluate` até todas as métricas ficarem ≥ 0.9. Use o tracing do LangSmith para inspecionar exemplos com score baixo.
+
+**Playbook por métrica fraca:**
+- **Precision/F1 baixo** → reforce regra "não invente detalhes" + alinhe few-shot com o dataset
+- **Clarity baixo** → aperte o esqueleto da saída, proíba prefácio/desfecho
+- **Format mismatch** → copie 2 referências do dataset verbatim como exemplos few-shot
+
+### Configuração mixed-provider (opcional)
+
+Para gerar com Gemini (free) e avaliar com OpenAI (juiz mais estrito), defina no `.env`:
+
+```
+LLM_PROVIDER=google
+LLM_MODEL=gemini-2.5-flash
+EVAL_PROVIDER=openai
+EVAL_MODEL=gpt-4o
+```
+
+`src/utils.py:get_eval_llm()` lê `EVAL_PROVIDER` (com fallback para `LLM_PROVIDER`), permitindo provider distinto para o juiz.

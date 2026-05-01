@@ -173,13 +173,14 @@ def extract_json_from_response(response_text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def get_llm(model: Optional[str] = None, temperature: float = 0.0):
+def get_llm(model: Optional[str] = None, temperature: float = 0.0, provider: Optional[str] = None):
     """
     Retorna uma instância de LLM configurada baseada no provider.
 
     Args:
         model: Nome do modelo (opcional, usa LLM_MODEL do .env por padrão)
         temperature: Temperatura para geração (padrão: 0.0 para determinístico)
+        provider: Provider explícito ('openai' ou 'google'); se None usa LLM_PROVIDER do .env
 
     Returns:
         Instância de ChatOpenAI ou ChatGoogleGenerativeAI
@@ -187,7 +188,7 @@ def get_llm(model: Optional[str] = None, temperature: float = 0.0):
     Raises:
         ValueError: Se provider não for suportado ou API key não configurada
     """
-    provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+    provider = (provider or os.getenv('LLM_PROVIDER', 'openai')).lower()
     model_name = model or os.getenv('LLM_MODEL', 'gpt-4o-mini')
 
     if provider == 'openai':
@@ -233,6 +234,9 @@ def get_eval_llm(temperature: float = 0.0):
     """
     Retorna LLM configurado especificamente para avaliação (usa EVAL_MODEL).
 
+    Permite mixed-provider: se EVAL_PROVIDER estiver definido no .env,
+    a avaliação roda nesse provider mesmo que LLM_PROVIDER seja outro.
+
     Args:
         temperature: Temperatura para geração
 
@@ -240,4 +244,5 @@ def get_eval_llm(temperature: float = 0.0):
         Instância de LLM configurada para avaliação
     """
     eval_model = os.getenv('EVAL_MODEL', 'gpt-4o')
-    return get_llm(model=eval_model, temperature=temperature)
+    eval_provider = os.getenv('EVAL_PROVIDER') or os.getenv('LLM_PROVIDER')
+    return get_llm(model=eval_model, temperature=temperature, provider=eval_provider)

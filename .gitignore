@@ -45,6 +45,7 @@ ENV/
 *.log
 
 # Project specific
-screenshots/
+# Anchored to root so docs/screenshots/ (committed evidence) is NOT ignored.
+/screenshots/
 results/
 .claude/

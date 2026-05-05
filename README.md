@@ -458,7 +458,7 @@ Métricas Customizadas:
 
 ```bash
 # 1. Clonar e entrar no diretório
-git clone <seu-fork>
+git clone git@github.com:fredschnek/mba-ia-pull-evaluation-prompt.git
 cd mba-ia-pull-evaluation-prompt
 
 # 2. Criar e ativar virtualenv

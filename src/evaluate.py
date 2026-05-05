@@ -36,6 +36,16 @@ def get_llm():
     return get_configured_llm(temperature=0)
 
 
+def required_api_key_for_provider(provider: str) -> str | None:
+    normalized_provider = provider.lower()
+
+    if normalized_provider == "openai":
+        return "OPENAI_API_KEY"
+    if normalized_provider in {"google", "gemini"}:
+        return "GOOGLE_API_KEY"
+    return None
+
+
 def load_dataset_from_jsonl(jsonl_path: str) -> List[Dict[str, Any]]:
     examples = []
 
@@ -274,20 +284,22 @@ def main():
     print_section_header("AVALIAÇÃO DE PROMPTS OTIMIZADOS")
 
     provider = os.getenv("LLM_PROVIDER", "openai")
+    eval_provider = os.getenv("EVAL_PROVIDER", provider)
     llm_model = os.getenv("LLM_MODEL", "gpt-4o-mini")
     eval_model = os.getenv("EVAL_MODEL", "gpt-4o")
 
     print(f"Provider: {provider}")
+    print(f"Provider de Avaliação: {eval_provider}")
     print(f"Modelo Principal: {llm_model}")
     print(f"Modelo de Avaliação: {eval_model}\n")
 
     required_vars = ["LANGSMITH_API_KEY", "LLM_PROVIDER"]
-    if provider == "openai":
-        required_vars.append("OPENAI_API_KEY")
-    elif provider in ["google", "gemini"]:
-        required_vars.append("GOOGLE_API_KEY")
+    for configured_provider in {provider, eval_provider}:
+        api_key_var = required_api_key_for_provider(configured_provider)
+        if api_key_var:
+            required_vars.append(api_key_var)
 
-    if not check_env_vars(required_vars):
+    if not check_env_vars(sorted(set(required_vars))):
         return 1
 
     client = Client()

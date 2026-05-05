@@ -207,7 +207,7 @@ def get_llm(model: Optional[str] = None, temperature: float = 0.0, provider: Opt
             api_key=api_key
         )
 
-    elif provider == 'google':
+    elif provider in {'google', 'gemini'}:
         from langchain_google_genai import ChatGoogleGenerativeAI
 
         api_key = os.getenv('GOOGLE_API_KEY')
@@ -226,7 +226,7 @@ def get_llm(model: Optional[str] = None, temperature: float = 0.0, provider: Opt
     else:
         raise ValueError(
             f"Provider '{provider}' não suportado.\n"
-            f"Use 'openai' ou 'google' na variável LLM_PROVIDER do .env"
+            f"Use 'openai', 'google' ou 'gemini' na variável LLM_PROVIDER do .env"
         )
 
 
